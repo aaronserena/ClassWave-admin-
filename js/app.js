@@ -969,6 +969,15 @@ async function handleScheduleSubmit(e) {
         body: JSON.stringify({ subject_name: subjectName, instructor: instructor })
       });
       const newSubjData = await newSubjRes.json();
+      
+      if (!newSubjRes.ok) {
+        throw new Error(`Subject Error: ${newSubjData.message || 'Check your Supabase RLS policies'}`);
+      }
+      
+      if (!newSubjData || newSubjData.length === 0) {
+        throw new Error('Failed to create subject. Please check Supabase RLS.');
+      }
+      
       subjectId = newSubjData[0].subject_id;
     }
 
@@ -988,7 +997,8 @@ async function handleScheduleSubmit(e) {
         headers: sbHeaders,
         body: JSON.stringify(scheduleData)
       });
-      if (!res.ok) throw new Error('Failed to add schedule');
+      const data = await res.json();
+      if (!res.ok) throw new Error(`Schedule Error: ${data.message || 'Check Supabase RLS'}`);
       showToast('Schedule added successfully!', 'success');
     } else {
       // Edit existing
