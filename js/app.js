@@ -971,11 +971,11 @@ async function handleScheduleSubmit(e) {
       const newSubjData = await newSubjRes.json();
       
       if (!newSubjRes.ok) {
-        throw new Error(`Subject Error: ${newSubjData.message || 'Check your Supabase RLS policies'}`);
+        throw new Error(`Supabase Error: ${newSubjData.message || 'Check RLS policies'}`);
       }
       
-      if (!newSubjData || newSubjData.length === 0) {
-        throw new Error('Failed to create subject. Please check Supabase RLS.');
+      if (!Array.isArray(newSubjData) || newSubjData.length === 0) {
+        throw new Error('Supabase did not return any data. Check your table permissions.');
       }
       
       subjectId = newSubjData[0].subject_id;
