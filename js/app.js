@@ -1,6 +1,6 @@
 /**
  * ClassWave — Admin Dashboard Application Logic
- * Extreme Stability Version
+ * Supabase Direct Migration (No PHP)
  */
 
 'use strict';
@@ -9,6 +9,7 @@
 let schedules = [];
 let students  = [];
 let admins    = [];
+let subjects  = [];
 let activeStudentIndex = -1;
 
 /* ─── DOM References ─────────────────────────── */
@@ -946,42 +947,58 @@ async function handleScheduleSubmit(e) {
   e.preventDefault();
   if (!validateForm()) return;
 
-  const entry = {
-    subject:   fSubject.value.trim(),
-    instructor:fInstructor.value.trim(),
-    room:      fRoom.value.trim(),
-    day:       fDay.value,
-    timeStart: fTimeStart.value,
-    timeEnd:   fTimeEnd.value,
-  };
-
-  const idx = editIndex.value;
+  const subjectName = fSubject.value.trim();
+  const instructor  = fInstructor.value.trim();
+  const room        = fRoom.value.trim();
+  const day         = fDay.value;
+  const timeStart   = fTimeStart.value.trim();
+  const timeEnd     = fTimeEnd.value.trim();
 
   try {
+    // 1. Find or Create Subject
+    let subjectId;
+    const subjRes = await fetch(`${SUPABASE_URL}/subjects?subject_name=eq.${encodeURIComponent(subjectName)}&instructor=eq.${encodeURIComponent(instructor)}`, { headers: sbHeaders });
+    const subjData = await subjRes.json();
+
+    if (subjData.length > 0) {
+      subjectId = subjData[0].subject_id;
+    } else {
+      const newSubjRes = await fetch(`${SUPABASE_URL}/subjects`, {
+        method: 'POST',
+        headers: sbHeaders,
+        body: JSON.stringify({ subject_name: subjectName, instructor: instructor })
+      });
+      const newSubjData = await newSubjRes.json();
+      subjectId = newSubjData[0].subject_id;
+    }
+
+    const idx = editIndex.value;
+    const scheduleData = {
+      subject_id: subjectId,
+      room,
+      day,
+      start_time: timeStart,
+      end_time: timeEnd
+    };
+
     if (idx === '') {
       // Add new
-      const res = await fetch('api/add_schedule.php', {
+      const res = await fetch(`${SUPABASE_URL}/schedules`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(entry)
+        headers: sbHeaders,
+        body: JSON.stringify(scheduleData)
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to add schedule');
-      
+      if (!res.ok) throw new Error('Failed to add schedule');
       showToast('Schedule added successfully!', 'success');
     } else {
       // Edit existing
       const existing = schedules[parseInt(idx, 10)];
-      const updateData = { ...entry, id: existing.id };
-      
-      const res = await fetch('api/update_schedule.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateData)
+      const res = await fetch(`${SUPABASE_URL}/schedules?schedule_id=eq.${existing.id}`, {
+        method: 'PATCH',
+        headers: sbHeaders,
+        body: JSON.stringify(scheduleData)
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to update schedule');
-
+      if (!res.ok) throw new Error('Failed to update schedule');
       showToast('Schedule updated successfully!', 'success');
     }
 
@@ -1716,29 +1733,54 @@ async function deleteAdmin(userId) {
 
 window.deleteAdmin = deleteAdmin;
 
-/* ─── API Integration ───────────────────────── */
+/* ─── Supabase Integration ─────────────────── */
 
 async function fetchAllData() {
   try {
-    const [schedRes, studRes] = await Promise.all([
-      fetch('api/get_schedules.php'),
-      fetch('api/get_students.php')
+    const [schedRes, studRes, subjRes] = await Promise.all([
+      fetch(`${SUPABASE_URL}/schedules?select=*,subjects(*)`, { headers: sbHeaders }),
+      fetch(`${SUPABASE_URL}/students`, { headers: sbHeaders }),
+      fetch(`${SUPABASE_URL}/subjects`, { headers: sbHeaders })
     ]);
 
-    if (!schedRes.ok || !studRes.ok) throw new Error('Failed to fetch data from API');
+    if (!schedRes.ok || !studRes.ok) throw new Error('Supabase Connection Error');
 
-    schedules = await schedRes.json();
-    students  = await studRes.json();
+    const rawSchedules = await schedRes.json();
+    students = await studRes.json();
+    subjects = await subjRes.json();
 
-    // Initial render
+    // Flatten schedules for existing UI compatibility
+    schedules = rawSchedules.map(s => ({
+      id: s.schedule_id,
+      subject: s.subjects?.subject_name || 'Unknown',
+      instructor: s.subjects?.instructor || 'N/A',
+      room: s.room,
+      day: s.day,
+      timeStart: s.start_time,
+      timeEnd: s.end_time,
+      subject_id: s.subject_id
+    }));
+
     renderSchedules();
     renderStudents();
     updateStats();
     renderTodayClasses();
     setCurrentDate();
+    fetchAdmins();
   } catch (error) {
-    console.error('API Error:', error);
-    showToast('Failed to connect to the backend server.', 'error');
+    console.error('Supabase Error:', error);
+    showToast('Failed to connect to Supabase.', 'error');
+  }
+}
+
+async function fetchAdmins() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/users`, { headers: sbHeaders });
+    if (!res.ok) throw new Error('Failed to fetch admins');
+    admins = await res.json();
+    renderAdmins();
+  } catch (error) {
+    console.error('Fetch Admins Error:', error);
   }
 }
 

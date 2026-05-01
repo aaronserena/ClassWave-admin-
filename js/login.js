@@ -29,72 +29,67 @@ document.addEventListener('DOMContentLoaded', () => {
   /**
    * Handle Form Submission
    */
-  loginForm.addEventListener('submit', (e) => {
+  loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const usernameInput = document.getElementById('username').value.trim();
     const passwordInput = document.getElementById('password').value;
+
+    if (!usernameInput || !passwordInput) {
+      showToast('Please enter both username and password.', 'error');
+      return;
+    }
 
     // Set loading state
     loginBtn.disabled = true;
     const originalText = loginBtn.innerHTML;
     loginBtn.innerHTML = '<span>Authenticating...</span><div class="spinner"></div>';
 
-    // Simulate network delay
-    setTimeout(async () => {
-      // 1. FRONTEND FALLBACK (For local development/server issues)
-      // If server is down, we still allow the super admin and default admin to enter
-      const isSuperAdmin = (usernameInput === 'serenaaaronpoe' && passwordInput === 'serenaaaronpoe123');
-      const isDefaultAdmin = (usernameInput === 'admin' && passwordInput === 'password123');
+    try {
+      // 1. Check Supabase
+      const res = await fetch(`${SUPABASE_URL}/users?username=eq.${encodeURIComponent(usernameInput)}&password=eq.${encodeURIComponent(passwordInput)}`, {
+        headers: sbHeaders
+      });
+      
+      const users = await res.json();
 
-      if (isSuperAdmin || isDefaultAdmin) {
-        showToast('Login successful (Local Override)!', 'success');
+      if (users.length > 0) {
+        const user = users[0];
+        showToast('Login successful!', 'success');
         
         localStorage.setItem('classwave_admin_logged_in', 'true');
-        localStorage.setItem('classwave_admin_user', isSuperAdmin ? 'Serena Aaron Poe' : 'System Administrator');
-        localStorage.setItem('classwave_admin_username', usernameInput);
-        localStorage.setItem('classwave_admin_role', isSuperAdmin ? 'super_admin' : 'admin');
+        localStorage.setItem('classwave_admin_user', user.full_name);
+        localStorage.setItem('classwave_admin_username', user.username);
+        localStorage.setItem('classwave_admin_role', user.role);
 
         setTimeout(() => {
           window.location.href = 'index.html';
         }, 1200);
-        return;
-      }
-
-      // 2. BACKEND AUTH (For real users/database)
-      try {
-        const response = await fetch('api/login.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: usernameInput, password: passwordInput })
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          showToast('Login successful!', 'success');
-          localStorage.setItem('classwave_admin_logged_in', 'true');
-          localStorage.setItem('classwave_admin_user', data.user.full_name);
-          localStorage.setItem('classwave_admin_username', data.user.username);
-          localStorage.setItem('classwave_admin_role', data.user.role);
-
-          setTimeout(() => {
-            window.location.href = 'index.html';
-          }, 1200);
-        } else {
-          showToast(data.message || 'Invalid username or password.', 'error');
-          loginBtn.disabled = false;
-          loginBtn.innerHTML = originalText;
-          loginForm.classList.add('shake');
-          setTimeout(() => loginForm.classList.remove('shake'), 500);
+      } else {
+        // 2. Local Fallback (for safety during migration)
+        const isSuperAdmin = (usernameInput === 'serenaaaronpoe' && passwordInput === 'serenaaaronpoe123');
+        if (isSuperAdmin) {
+           showToast('Login successful (Override)!', 'success');
+           localStorage.setItem('classwave_admin_logged_in', 'true');
+           localStorage.setItem('classwave_admin_user', 'Serena Aaron Poe');
+           localStorage.setItem('classwave_admin_username', 'serenaaaronpoe');
+           localStorage.setItem('classwave_admin_role', 'super_admin');
+           setTimeout(() => window.location.href = 'index.html', 1200);
+           return;
         }
-      } catch (error) {
-        // If we reach here, it means the server is really down, 
-        // but since we checked common credentials above, this is only for non-dev accounts
-        showToast('Server connection failed. Using local fallback...', 'warning');
-        console.error('Login error:', error);
+
+        showToast('Invalid username or password.', 'error');
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = originalText;
+        loginForm.classList.add('shake');
+        setTimeout(() => loginForm.classList.remove('shake'), 500);
       }
-    }, 1000);
+    } catch (error) {
+      console.error('Login Error:', error);
+      showToast('Connection failed. Please check your internet.', 'error');
+      loginBtn.disabled = false;
+      loginBtn.innerHTML = originalText;
+    }
   });
 });
 
