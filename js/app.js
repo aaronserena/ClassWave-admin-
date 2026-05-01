@@ -887,34 +887,38 @@ window.openEditModal = openEditModal;
 
 /* ─── Form Validation ────────────────────────── */
 function validateForm() {
-  let valid = true;
   clearErrors();
+  let valid = true;
 
-  if (!fSubject?.value.trim()) {
-    showError('err-subject', 'Subject name is required.', fSubject);
+  const subjectVal = (fSubject?.value || '').trim();
+  const instrVal   = (fInstructor?.value || '').trim();
+  const roomVal    = (fRoom?.value || '').trim();
+  const dayVal     = fDay?.value || '';
+  const startVal   = (fTimeStart?.value || '').trim();
+  const endVal     = (fTimeEnd?.value || '').trim();
+
+  if (!subjectVal) {
+    showError('err-subject', 'Subject Name is required.', fSubject);
     valid = false;
   }
-  if (!fInstructor?.value.trim()) {
-    showError('err-instructor', 'Instructor name is required.', fInstructor);
+  if (!instrVal) {
+    showError('err-instructor', 'Instructor is required.', fInstructor);
     valid = false;
   }
-  if (!fRoom?.value.trim()) {
+  if (!roomVal) {
     showError('err-room', 'Room is required.', fRoom);
     valid = false;
   }
-  if (!fDay?.value) {
+  if (!dayVal) {
     showError('err-day', 'Please select a day.', fDay);
     valid = false;
   }
-  if (!fTimeStart?.value) {
+  if (!startVal) {
     showError('err-time-start', 'Start time is required.', fTimeStart);
     valid = false;
   }
-  if (!fTimeEnd?.value) {
+  if (!endVal) {
     showError('err-time-end', 'End time is required.', fTimeEnd);
-    valid = false;
-  } else if (fTimeStart?.value && fTimeEnd.value <= fTimeStart.value) {
-    showError('err-time-end', 'End time must be after start time.', fTimeEnd);
     valid = false;
   }
 
