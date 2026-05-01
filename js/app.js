@@ -984,8 +984,12 @@ async function handleScheduleSubmit(e) {
     closeModal(modalOverlay);
     fetchAllData();
   } catch (error) {
-    console.error('Submit Error:', error);
-    showToast(error.message, 'error');
+    console.error('Submit Error Details:', error);
+    // If it's the strange Safari pattern error, let's give more context
+    const msg = error.message === 'The string did not match the expected pattern' 
+      ? 'Browser Validation Error: Check your input formats.' 
+      : error.message;
+    showToast(msg, 'error');
   }
 }
 
