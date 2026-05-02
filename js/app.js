@@ -1748,28 +1748,34 @@ window.deleteAdmin = deleteAdmin;
 async function fetchAllData() {
   try {
     const [schedRes, studRes, subjRes] = await Promise.all([
-      fetch(`${SUPABASE_URL}/schedules?select=*,subjects(*)`, { headers: sbHeaders }),
+      fetch(`${SUPABASE_URL}/schedules`, { headers: sbHeaders }),
       fetch(`${SUPABASE_URL}/students`, { headers: sbHeaders }),
       fetch(`${SUPABASE_URL}/subjects`, { headers: sbHeaders })
     ]);
 
-    if (!schedRes.ok || !studRes.ok) throw new Error('Supabase Connection Error');
+    if (!schedRes.ok || !studRes.ok || !subjRes.ok) {
+      const errData = await (schedRes.ok ? (studRes.ok ? subjRes : studRes) : schedRes).json();
+      throw new Error(errData.message || 'Supabase Connection Error');
+    }
 
     const rawSchedules = await schedRes.json();
     students = await studRes.json();
     subjects = await subjRes.json();
 
-    // Flatten schedules for existing UI compatibility
-    schedules = rawSchedules.map(s => ({
-      id: s.schedule_id,
-      subject: s.subjects?.subject_name || 'Unknown',
-      instructor: s.subjects?.instructor || 'N/A',
-      room: s.room,
-      day: s.day,
-      timeStart: s.start_time,
-      timeEnd: s.end_time,
-      subject_id: s.subject_id
-    }));
+    // Join subjects to schedules in memory
+    schedules = rawSchedules.map(s => {
+      const subj = subjects.find(sub => sub.subject_id === s.subject_id);
+      return {
+        id: s.schedule_id,
+        subject: subj ? subj.subject_name : 'Unknown',
+        instructor: subj ? subj.instructor : 'N/A',
+        room: s.room,
+        day: s.day,
+        timeStart: s.start_time,
+        timeEnd: s.end_time,
+        subject_id: s.subject_id
+      };
+    });
 
     renderSchedules();
     renderStudents();
