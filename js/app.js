@@ -1746,6 +1746,12 @@ window.deleteAdmin = deleteAdmin;
 /* ─── Supabase Integration ─────────────────── */
 
 async function fetchAllData() {
+  if (typeof SUPABASE_URL === 'undefined') {
+    console.error('Configuration not loaded! Check if js/config.js is included.');
+    showToast('System Error: Configuration missing.', 'error');
+    return;
+  }
+
   try {
     const [schedRes, studRes, subjRes] = await Promise.all([
       fetch(`${SUPABASE_URL}/schedules`, { headers: sbHeaders }),
@@ -1754,8 +1760,9 @@ async function fetchAllData() {
     ]);
 
     if (!schedRes.ok || !studRes.ok || !subjRes.ok) {
-      const errData = await (schedRes.ok ? (studRes.ok ? subjRes : studRes) : schedRes).json();
-      throw new Error(errData.message || 'Supabase Connection Error');
+      const errRes = !schedRes.ok ? schedRes : (!studRes.ok ? studRes : subjRes);
+      const errData = await errRes.json().catch(() => ({ message: `HTTP ${errRes.status}` }));
+      throw new Error(errData.message || `Error ${errRes.status}`);
     }
 
     const rawSchedules = await schedRes.json();
