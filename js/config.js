@@ -1,10 +1,10 @@
 /**
- * ClassWave — Global Configuration (Master Key Mode)
+ * ClassWave — Global Configuration (NEW DATABASE)
  */
-const SUPABASE_URL = 'https://oxrypntbjpjlanbdvbpm.supabase.co/rest/v1';
+const SUPABASE_URL = 'https://hukiftsvugmokstsavoz.supabase.co/rest/v1';
 
-// Using the Service Role Key to bypass RLS blocks
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94cnlwbnRianBqbGFuYmR2YnBtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzYxODA1NiwiZXhwIjoyMDkzMTk0MDU2fQ.81R5tBZuMk50yvuYX9LYcHPfR7QlWDs_KHOhpq8OMRo';
+// Using the NEW Service Role Key to bypass RLS blocks
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1a2lmdHN2dWdtb2tzdHNhdm96Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzcxNzEwNiwiZXhwIjoyMDkzMjkzMTA2fQ.wfLKy7zAF4B1obUi_fWhNUVfV07woAKkBDaMV59rW7c';
 
 const sbHeaders = {
   'apikey': SUPABASE_KEY,
