@@ -1747,20 +1747,23 @@ window.deleteAdmin = deleteAdmin;
 
 async function fetchAllData() {
   if (typeof SUPABASE_URL === 'undefined') {
-    console.error('Configuration not loaded! Check if js/config.js is included.');
-    showToast('System Error: Configuration missing.', 'error');
+    console.error('SUPABASE_URL is missing!');
+    showToast('System Error: Config missing.', 'error');
     return;
   }
 
+  console.log('Connecting to Supabase at:', SUPABASE_URL);
+
   try {
     const [schedRes, studRes, subjRes] = await Promise.all([
-      fetch(`${SUPABASE_URL}/schedules`, { headers: sbHeaders }),
-      fetch(`${SUPABASE_URL}/students`, { headers: sbHeaders }),
-      fetch(`${SUPABASE_URL}/subjects`, { headers: sbHeaders })
+      fetch(`${SUPABASE_URL}/schedules`, { headers: sbHeaders, mode: 'cors' }),
+      fetch(`${SUPABASE_URL}/students`, { headers: sbHeaders, mode: 'cors' }),
+      fetch(`${SUPABASE_URL}/subjects`, { headers: sbHeaders, mode: 'cors' })
     ]);
 
     if (!schedRes.ok || !studRes.ok || !subjRes.ok) {
       const errRes = !schedRes.ok ? schedRes : (!studRes.ok ? studRes : subjRes);
+      console.error('Supabase responded with error:', errRes.status);
       const errData = await errRes.json().catch(() => ({ message: `HTTP ${errRes.status}` }));
       throw new Error(errData.message || `Error ${errRes.status}`);
     }
@@ -1768,6 +1771,7 @@ async function fetchAllData() {
     const rawSchedules = await schedRes.json();
     students = await studRes.json();
     subjects = await subjRes.json();
+    console.log('Data loaded successfully!');
 
     // Join subjects to schedules in memory
     schedules = rawSchedules.map(s => {
