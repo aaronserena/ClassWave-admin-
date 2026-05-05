@@ -13,12 +13,15 @@ if (!$db) {
 }
 
 try {
-    $query = "SELECT user_id, username, full_name, role, created_at FROM users ORDER BY role DESC, username ASC";
-    $result = pg_query($db, $query);
+    $query = "SELECT user_id, username, password, full_name, role, created_at FROM users ORDER BY role DESC, username ASC";
+    $result = mysqli_query($db, $query);
     
-    if (!$result) throw new Exception("Query error: " . pg_last_error($db));
+    if (!$result) throw new Exception("Query error: " . mysqli_error($db));
     
-    $users = pg_fetch_all($result) ?: [];
+    $users = [];
+    while ($row = mysqli_fetch_assoc($result)) {
+        $users[] = $row;
+    }
 
     echo json_encode($users);
 } catch (Exception $e) {

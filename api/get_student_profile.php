@@ -23,18 +23,18 @@ if (!$db) {
 }
 
 try {
-    $query = "SELECT * FROM students WHERE student_id = $1 LIMIT 1";
-    $result = pg_query_params($db, $query, [$student_id]);
+    $query = "SELECT * FROM students WHERE student_id = ? LIMIT 1";
+    $stmt = mysqli_prepare($db, $query);
+    mysqli_stmt_bind_param($stmt, "s", $student_id);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
     
-    if (!$result) throw new Exception(pg_last_error($db));
+    if (!$result) throw new Exception(mysqli_error($db));
     
-    $student = pg_fetch_assoc($result);
+    $student = mysqli_fetch_assoc($result);
 
     if ($student) {
-        echo json_encode([
-            'success' => true,
-            'student' => $student
-        ]);
+        echo json_encode($student);
     } else {
         http_response_code(404);
         echo json_encode(['message' => 'Student not found.']);

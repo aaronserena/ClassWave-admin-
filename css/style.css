@@ -1042,6 +1042,35 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 14px;
   margin-bottom: 14px;
+  align-items: start;
+}
+
+/* ── Time Picker Dropdowns ───────────────────── */
+.time-picker-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Hour and Minute selects get equal flex space */
+.time-picker-group .time-select {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+/* AM/PM select is narrower */
+.time-picker-group .time-select-ampm {
+  flex: 0 0 68px;
+}
+
+.time-picker-group .time-colon {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--gray-400);
+  flex-shrink: 0;
+  margin-bottom: 0;
+  line-height: 1;
 }
 
 .form-group {
@@ -1089,6 +1118,46 @@ body {
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 36px;
+}
+
+.day-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.day-chip {
+  cursor: pointer;
+}
+
+.day-chip input {
+  display: none;
+}
+
+.day-chip span {
+  display: inline-block;
+  padding: 6px 12px;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1.5px solid transparent;
+  transition: all var(--transition);
+  user-select: none;
+}
+
+.day-chip:hover span {
+  background: var(--purple-50);
+  color: var(--purple-600);
+}
+
+.day-chip input:checked + span {
+  background: var(--purple-100);
+  color: var(--purple-600);
+  border-color: var(--purple-400);
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.15);
 }
 
 .form-error {

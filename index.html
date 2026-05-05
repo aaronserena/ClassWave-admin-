@@ -413,10 +413,6 @@
           </div>
           <select class="filter-select" id="filter-course">
             <option value="">All Courses</option>
-            <option value="BSCS">BSCS</option>
-            <option value="BSIT">BSIT</option>
-            <option value="BSECE">BSECE</option>
-            <option value="BSMATH">BSMATH</option>
           </select>
         </div>
 
@@ -476,6 +472,7 @@
                   <th width="60">#</th>
                   <th>Full Name</th>
                   <th>Username</th>
+                  <th>Password</th>
                   <th>Role</th>
                   <th>Actions</th>
                 </tr>
@@ -538,32 +535,88 @@
               <span class="form-error" id="err-room"></span>
             </div>
             <div class="form-group">
-              <label class="form-label" for="f-day">Day <span class="required">*</span></label>
-              <select id="f-day" class="form-input form-select">
-                <option value="">Select day…</option>
-                <option value="Monday">Monday</option>
-                <option value="Tuesday">Tuesday</option>
-                <option value="Wednesday">Wednesday</option>
-                <option value="Thursday">Thursday</option>
-                <option value="Friday">Friday</option>
-                <option value="Saturday">Saturday</option>
-              </select>
+              <label class="form-label">Day(s) <span class="required">*</span></label>
+              <div class="day-chips" id="day-chips-container">
+                <label class="day-chip">
+                  <input type="checkbox" name="days" value="Monday">
+                  <span>Mon</span>
+                </label>
+                <label class="day-chip">
+                  <input type="checkbox" name="days" value="Tuesday">
+                  <span>Tue</span>
+                </label>
+                <label class="day-chip">
+                  <input type="checkbox" name="days" value="Wednesday">
+                  <span>Wed</span>
+                </label>
+                <label class="day-chip">
+                  <input type="checkbox" name="days" value="Thursday">
+                  <span>Thu</span>
+                </label>
+                <label class="day-chip">
+                  <input type="checkbox" name="days" value="Friday">
+                  <span>Fri</span>
+                </label>
+                <label class="day-chip">
+                  <input type="checkbox" name="days" value="Saturday">
+                  <span>Sat</span>
+                </label>
+                <label class="day-chip">
+                  <input type="checkbox" name="days" value="Sunday">
+                  <span>Sun</span>
+                </label>
+              </div>
               <span class="form-error" id="err-day"></span>
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label" for="f-time-start">Time Start <span class="required">*</span></label>
-              <input type="text" id="f-time-start" class="form-input" placeholder="e.g. 07:30 AM" />
+              <label class="form-label">Time Start <span class="required">*</span></label>
+              <div class="time-picker-group">
+                <select id="f-time-start-hour" class="form-input form-select time-select">
+                  <option value="">HH</option>
+                  <option>01</option><option>02</option><option>03</option>
+                  <option>04</option><option>05</option><option>06</option>
+                  <option>07</option><option>08</option><option>09</option>
+                  <option>10</option><option>11</option><option>12</option>
+                </select>
+                <span class="time-colon">:</span>
+                <select id="f-time-start-min" class="form-input form-select time-select">
+                  <option value="">MM</option>
+                  <option>00</option><option>15</option><option>30</option><option>45</option>
+                </select>
+                <select id="f-time-start-ampm" class="form-input form-select time-select time-select-ampm">
+                  <option value="">—</option>
+                  <option>AM</option><option>PM</option>
+                </select>
+              </div>
               <span class="form-error" id="err-time-start"></span>
             </div>
             <div class="form-group">
-              <label class="form-label" for="f-time-end">Time End <span class="required">*</span></label>
-              <input type="text" id="f-time-end" class="form-input" placeholder="e.g. 08:30 AM" />
+              <label class="form-label">Time End <span class="required">*</span></label>
+              <div class="time-picker-group">
+                <select id="f-time-end-hour" class="form-input form-select time-select">
+                  <option value="">HH</option>
+                  <option>01</option><option>02</option><option>03</option>
+                  <option>04</option><option>05</option><option>06</option>
+                  <option>07</option><option>08</option><option>09</option>
+                  <option>10</option><option>11</option><option>12</option>
+                </select>
+                <span class="time-colon">:</span>
+                <select id="f-time-end-min" class="form-input form-select time-select">
+                  <option value="">MM</option>
+                  <option>00</option><option>15</option><option>30</option><option>45</option>
+                </select>
+                <select id="f-time-end-ampm" class="form-input form-select time-select time-select-ampm">
+                  <option value="">—</option>
+                  <option>AM</option><option>PM</option>
+                </select>
+              </div>
               <span class="form-error" id="err-time-end"></span>
             </div>
           </div>
+
 
           <div class="modal-actions">
             <button type="button" class="btn-outline" id="btn-cancel">Cancel</button>

@@ -1,14 +1,12 @@
 <?php
 /**
- * UPDATE Schedule
- * 
- * Receives JSON input including schedule_id and updates the record.
+ * UPDATE Schedule (MySQL Version)
+ * Handles time format conversion from 12-hour (AM/PM) to 24-hour MySQL TIME format.
  */
 
 header('Content-Type: application/json');
 require_once 'config.php';
 
-// Get JSON input
 $input = json_decode(file_get_contents('php://input'), true);
 
 if (!$input || empty($input['id'])) {
@@ -17,54 +15,72 @@ if (!$input || empty($input['id'])) {
     exit;
 }
 
-// Start transaction
-pg_query($db, "BEGIN");
+// Convert 12-hour time (e.g. "07:30 AM") to 24-hour MySQL TIME format ("07:30:00")
+function toMysqlTime($timeStr) {
+    $t = date_create_from_format('h:i A', strtoupper(trim($timeStr)));
+    if (!$t) {
+        $t = date_create_from_format('H:i', trim($timeStr));
+    }
+    return $t ? date_format($t, 'H:i:s') : null;
+}
+
+mysqli_begin_transaction($db);
 
 try {
-    // 1. Find or Create Subject (if subject/instructor provided)
+    // 1. Find or Create Subject
     $subject_id = null;
     if (!empty($input['subject']) && !empty($input['instructor'])) {
-        $subj_query = "SELECT subject_id FROM subjects WHERE subject_name = $1 AND instructor = $2 LIMIT 1";
-        $subj_res = pg_query_params($db, $subj_query, [$input['subject'], $input['instructor']]);
-        
-        if ($subj_row = pg_fetch_assoc($subj_res)) {
+        $stmt = mysqli_prepare($db, "SELECT subject_id FROM subjects WHERE subject_name = ? AND instructor = ? LIMIT 1");
+        mysqli_stmt_bind_param($stmt, "ss", $input['subject'], $input['instructor']);
+        mysqli_stmt_execute($stmt);
+        $res = mysqli_stmt_get_result($stmt);
+        $subj_row = mysqli_fetch_assoc($res);
+
+        if ($subj_row) {
             $subject_id = $subj_row['subject_id'];
         } else {
-            $ins_subj = "INSERT INTO subjects (subject_name, instructor) VALUES ($1, $2) RETURNING subject_id";
-            $ins_res = pg_query_params($db, $ins_subj, [$input['subject'], $input['instructor']]);
-            $subject_id = pg_fetch_result($ins_res, 0, 0);
+            $ins_stmt = mysqli_prepare($db, "INSERT INTO subjects (subject_name, instructor) VALUES (?, ?)");
+            mysqli_stmt_bind_param($ins_stmt, "ss", $input['subject'], $input['instructor']);
+            if (!mysqli_stmt_execute($ins_stmt)) throw new Exception("Failed to create subject: " . mysqli_error($db));
+            $subject_id = mysqli_insert_id($db);
         }
     }
 
-    // 2. Update Schedule
-    $update_query = "
-        UPDATE schedules 
-        SET 
-            room = COALESCE($1, room),
-            day = COALESCE($2, day),
-            start_time = COALESCE($3, start_time),
-            end_time = COALESCE($4, end_time),
-            subject_id = COALESCE($5, subject_id)
-        WHERE schedule_id = $6
-    ";
-    
-    $update_res = pg_query_params($db, $update_query, [
-        $input['room'] ?? null,
-        $input['day'] ?? null,
-        $input['timeStart'] ?? null,
-        $input['timeEnd'] ?? null,
-        $subject_id,
-        $input['id']
-    ]);
-    
-    if (!$update_res) throw new Exception("Failed to update schedule: " . pg_last_error($db));
-    if (pg_affected_rows($update_res) == 0) throw new Exception("Schedule not found");
+    // 2. Convert times
+    $startTime = !empty($input['timeStart']) ? toMysqlTime($input['timeStart']) : null;
+    $endTime   = !empty($input['timeEnd'])   ? toMysqlTime($input['timeEnd'])   : null;
 
-    pg_query($db, "COMMIT");
+    // 3. Update Schedule
+    $room = $input['room'] ?? null;
+    $day = $input['day'] ?? null;
+    $schedule_id = $input['id'];
+
+    $update_stmt = mysqli_prepare($db, "
+        UPDATE schedules SET
+            room       = COALESCE(?, room),
+            day        = COALESCE(?, day),
+            start_time = COALESCE(?, start_time),
+            end_time   = COALESCE(?, end_time),
+            subject_id = COALESCE(?, subject_id)
+        WHERE schedule_id = ?
+    ");
+    mysqli_stmt_bind_param($update_stmt, "ssssii",
+        $room,
+        $day,
+        $startTime,
+        $endTime,
+        $subject_id,
+        $schedule_id
+    );
+
+    if (!mysqli_stmt_execute($update_stmt)) throw new Exception("Failed to update schedule: " . mysqli_error($db));
+    if (mysqli_affected_rows($db) == 0) throw new Exception("Schedule not found");
+
+    mysqli_commit($db);
     echo json_encode(["status" => "success", "message" => "Schedule updated successfully"]);
 
 } catch (Exception $e) {
-    pg_query($db, "ROLLBACK");
+    mysqli_rollback($db);
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }

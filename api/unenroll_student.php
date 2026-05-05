@@ -16,12 +16,14 @@ if (!$input || empty($input['schedule_id']) || empty($input['student_id'])) {
     exit;
 }
 
-$query = "DELETE FROM enrollments WHERE schedule_id = $1 AND student_id = $2";
-$result = pg_query_params($db, $query, [$input['schedule_id'], $input['student_id']]);
+$stmt = mysqli_prepare($db, "DELETE FROM enrollments WHERE schedule_id = ? AND student_id = ?");
+$schedule_id = $input['schedule_id'];
+$student_id = $input['student_id'];
+mysqli_stmt_bind_param($stmt, "is", $schedule_id, $student_id);
 
-if (!$result) {
+if (!mysqli_stmt_execute($stmt)) {
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "Unenrollment failed: " . pg_last_error($db)]);
+    echo json_encode(["status" => "error", "message" => "Unenrollment failed: " . mysqli_error($db)]);
     exit;
 }
 

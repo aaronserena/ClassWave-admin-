@@ -21,23 +21,24 @@ if (!isset($input['username']) || !isset($input['password']) || !isset($input['f
 }
 
 try {
-    $query = "INSERT INTO users (username, password, full_name, role) VALUES ($1, $2, $3, 'admin')";
-    $result = pg_query_params($db, $query, [
-        $input['username'],
-        $input['password'],
-        $input['full_name']
-    ]);
+    $stmt = mysqli_prepare($db, "INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, 'admin')");
+    
+    $username = $input['username'];
+    $password = $input['password'];
+    $full_name = $input['full_name'];
+    
+    mysqli_stmt_bind_param($stmt, "sss", $username, $password, $full_name);
 
-    if (!$result) {
-        $error = pg_last_error($db);
-        if (strpos($error, 'duplicate key') !== false) {
+    if (mysqli_stmt_execute($stmt)) {
+        echo json_encode(['message' => 'Admin account created successfully.']);
+    } else {
+        $error = mysqli_error($db);
+        if (strpos($error, 'Duplicate entry') !== false) {
             http_response_code(409);
             echo json_encode(['message' => 'Username already exists.']);
         } else {
             throw new Exception($error);
         }
-    } else {
-        echo json_encode(['message' => 'Admin account created successfully.']);
     }
 } catch (Exception $e) {
     http_response_code(500);

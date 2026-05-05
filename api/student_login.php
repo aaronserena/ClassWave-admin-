@@ -29,12 +29,15 @@ if (!$db) {
 }
 
 try {
-    $query = "SELECT * FROM students WHERE student_id = $1 AND is_active = TRUE LIMIT 1";
-    $result = pg_query_params($db, $query, [$student_id]);
+    $query = "SELECT * FROM students WHERE student_id = ? AND is_active = TRUE LIMIT 1";
+    $stmt = mysqli_prepare($db, $query);
+    mysqli_stmt_bind_param($stmt, "s", $student_id);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
     
-    if (!$result) throw new Exception(pg_last_error($db));
+    if (!$result) throw new Exception(mysqli_error($db));
     
-    $student = pg_fetch_assoc($result);
+    $student = mysqli_fetch_assoc($result);
 
     if ($student) {
         $default_password = 'student' . $student['student_id'];
@@ -50,14 +53,14 @@ try {
 
         if ($is_valid) {
             echo json_encode([
-                'success' => true,
+                'status' => 'success',
                 'message' => 'Login successful',
                 'student' => $student
             ]);
         } else {
             http_response_code(401);
             echo json_encode([
-                'success' => false,
+                'status' => 'error',
                 'message' => 'Incorrect password.'
             ]);
         }

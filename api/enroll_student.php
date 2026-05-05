@@ -1,8 +1,6 @@
 <?php
 /**
- * ENROLL Student
- * 
- * Links a student to a schedule.
+ * ENROLL Student (MySQL Version)
  */
 
 header('Content-Type: application/json');
@@ -16,12 +14,15 @@ if (!$input || empty($input['schedule_id']) || empty($input['student_id'])) {
     exit;
 }
 
-$query = "INSERT INTO enrollments (schedule_id, student_id) VALUES ($1, $2) ON CONFLICT DO NOTHING";
-$result = pg_query_params($db, $query, [$input['schedule_id'], $input['student_id']]);
+$query = "INSERT IGNORE INTO enrollments (schedule_id, student_id) VALUES (?, ?)";
+$stmt = mysqli_prepare($db, $query);
+$schedule_id = $input['schedule_id'];
+$student_id = $input['student_id'];
+mysqli_stmt_bind_param($stmt, "is", $schedule_id, $student_id);
 
-if (!$result) {
+if (!mysqli_stmt_execute($stmt)) {
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "Enrollment failed: " . pg_last_error($db)]);
+    echo json_encode(["status" => "error", "message" => "Enrollment failed: " . mysqli_error($db)]);
     exit;
 }
 

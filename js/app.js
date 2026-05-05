@@ -1,12 +1,11 @@
-/* ─── Supabase Configuration ────────────────── */
-const SUPABASE_URL = 'https://hukiftsvugmokstsavoz.supabase.co/rest/v1';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1a2lmdHN2dWdtb2tzdHNhdm96Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzcxNzEwNiwiZXhwIjoyMDkzMjkzMTA2fQ.wfLKy7zAF4B1obUi_fWhNUVfV07woAKkBDaMV59rW7c';
+/**
+ * ClassWave — Admin Dashboard Application Logic
+ * Local PHP API Version
+ */
 
-const sbHeaders = {
-  'apikey': SUPABASE_KEY,
-  'Authorization': `Bearer ${SUPABASE_KEY}`,
-  'Content-Type': 'application/json'
-};
+'use strict';
+
+const API_BASE = 'api';
 
 /* ─── Global State ───────────────────────────── */
 let schedules = [];
@@ -44,6 +43,29 @@ function escHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/**
+ * Converts 24-hour SQL time (e.g. "13:30:00") to 12-hour AM/PM format ("01:30 PM").
+ * Also safely handles times that are already in 12-hour format.
+ */
+function formatTime(timeStr) {
+  if (!timeStr) return '';
+  // If it already has AM/PM, return as is
+  if (timeStr.match(/AM|PM/i)) return timeStr;
+  
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
+  
+  let hours = parseInt(parts[0], 10);
+  const minutes = parts[1];
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  
+  hours = hours % 12;
+  hours = hours ? hours : 12; // the hour '0' should be '12'
+  const strHours = hours < 10 ? '0' + hours : hours;
+  
+  return `${strHours}:${minutes} ${ampm}`;
 }
 
 /* ─── Utility: Debounce ─────────────────────── */
@@ -189,8 +211,9 @@ function initApp() {
   fInstructor       = document.getElementById('f-instructor');
   fRoom             = document.getElementById('f-room');
   fDay              = document.getElementById('f-day');
-  fTimeStart        = document.getElementById('f-time-start');
-  fTimeEnd          = document.getElementById('f-time-end');
+  // Time dropdowns are read via helper functions — no single element reference needed
+  fTimeStart = null; // kept for legacy clearErrors compatibility
+  fTimeEnd   = null;
 
   notifPanel        = document.getElementById('notifPanel');
   notifOverlay      = document.getElementById('notifOverlay');
@@ -760,6 +783,30 @@ function renderSchedules(filter = '') {
 }
 
 /* ─── Student Table ─────────────────────────── */
+function updateCourseFilterOptions() {
+  if (!filterCourse) return;
+  const currentSelection = filterCourse.value;
+  
+  // Extract unique courses from students array
+  const activeCourses = [...new Set(students.map(s => s.course))].filter(Boolean).sort();
+  
+  // Rebuild the select options
+  filterCourse.innerHTML = '<option value="">All Courses</option>';
+  activeCourses.forEach(course => {
+    const opt = document.createElement('option');
+    opt.value = course;
+    opt.textContent = course;
+    filterCourse.appendChild(opt);
+  });
+  
+  // Restore selection if it still exists
+  if (activeCourses.includes(currentSelection)) {
+    filterCourse.value = currentSelection;
+  } else {
+    filterCourse.value = "";
+  }
+}
+
 function renderStudents(filter = '') {
   const courseFilter = filterCourse ? filterCourse.value : '';
   const searchFilter = filter.toLowerCase().trim();
@@ -858,9 +905,14 @@ function escHtml(str) {
 /* ─── Modal: Add / Edit Schedule ───────────── */
 function openAddModal() {
   modalTitle.textContent = 'Add Schedule';
-  document.getElementById('btn-save').textContent = 'Save Schedule';
+  const saveBtn = document.getElementById('btn-save');
+  if (saveBtn) saveBtn.textContent = 'Save Schedule';
   editIndex.value = '';
   scheduleForm.reset();
+  
+  // Clear all day chips
+  document.querySelectorAll('input[name="days"]').forEach(cb => cb.checked = false);
+  
   clearErrors();
   openModal(modalOverlay);
   fSubject.focus();
@@ -871,15 +923,21 @@ function openEditModal(index) {
   if (!s) return;
 
   modalTitle.textContent = 'Edit Schedule';
-  document.getElementById('btn-save').textContent = 'Update Schedule';
+  const saveBtn = document.getElementById('btn-save');
+  if (saveBtn) saveBtn.textContent = 'Update Schedule';
   editIndex.value = index;
 
   fSubject.value   = s.subject;
   fInstructor.value= s.instructor;
   fRoom.value      = s.room;
-  fDay.value       = s.day;
-  fTimeStart.value = s.timeStart;
-  fTimeEnd.value   = s.timeEnd;
+  
+  // Pre-select the day chip
+  document.querySelectorAll('input[name="days"]').forEach(cb => {
+    cb.checked = (cb.value === s.day);
+  });
+  
+  setTimeValue('start', s.timeStart);
+  setTimeValue('end',   s.timeEnd);
 
   clearErrors();
   openModal(modalOverlay);
@@ -889,6 +947,53 @@ function openEditModal(index) {
 /* Expose to inline onclick */
 window.openEditModal = openEditModal;
 
+/* ─── Time Picker Helpers ───────────────────── */
+/**
+ * Read the three time dropdowns and return a combined string like "07:30 AM".
+ * Returns empty string if any dropdown is not selected.
+ */
+function getTimeValue(prefix) {
+  const h  = document.getElementById(`f-time-${prefix}-hour`)?.value  || '';
+  const m  = document.getElementById(`f-time-${prefix}-min`)?.value   || '';
+  const ap = document.getElementById(`f-time-${prefix}-ampm`)?.value  || '';
+  if (!h || !m || !ap) return '';
+  return `${h}:${m} ${ap}`;
+}
+
+/**
+ * Pre-fill the three time dropdowns from a stored time string.
+ * Accepts "07:30 AM" (12h) or "07:30:00" / "07:30" (24h from DB).
+ */
+function setTimeValue(prefix, timeStr) {
+  if (!timeStr) return;
+  let h, m, ap;
+  const ampmMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (ampmMatch) {
+    h  = ampmMatch[1].padStart(2, '0');
+    m  = ampmMatch[2];
+    ap = ampmMatch[3].toUpperCase();
+  } else {
+    // 24-hour from DB e.g. "13:30:00"
+    const parts = timeStr.split(':');
+    let hour = parseInt(parts[0], 10);
+    m  = parts[1] || '00';
+    ap = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12 || 12;
+    h  = String(hour).padStart(2, '0');
+  }
+  const hourEl = document.getElementById(`f-time-${prefix}-hour`);
+  const minEl  = document.getElementById(`f-time-${prefix}-min`);
+  const ampmEl = document.getElementById(`f-time-${prefix}-ampm`);
+  if (hourEl) hourEl.value = h;
+  if (minEl)  minEl.value  = m;
+  if (ampmEl) ampmEl.value = ap;
+}
+
+function getSelectedDays() {
+  const checkboxes = document.querySelectorAll('input[name="days"]:checked');
+  return Array.from(checkboxes).map(cb => cb.value);
+}
+
 /* ─── Form Validation ────────────────────────── */
 function validateForm() {
   clearErrors();
@@ -897,9 +1002,9 @@ function validateForm() {
   const subjectVal = (fSubject?.value || '').trim();
   const instrVal   = (fInstructor?.value || '').trim();
   const roomVal    = (fRoom?.value || '').trim();
-  const dayVal     = fDay?.value || '';
-  const startVal   = (fTimeStart?.value || '').trim();
-  const endVal     = (fTimeEnd?.value || '').trim();
+  const days       = getSelectedDays();
+  const startVal   = getTimeValue('start');
+  const endVal     = getTimeValue('end');
 
   if (!subjectVal) {
     showError('err-subject', 'Subject Name is required.', fSubject);
@@ -913,16 +1018,16 @@ function validateForm() {
     showError('err-room', 'Room is required.', fRoom);
     valid = false;
   }
-  if (!dayVal) {
-    showError('err-day', 'Please select a day.', fDay);
+  if (days.length === 0) {
+    showError('err-day', 'Select at least one day.', null);
     valid = false;
   }
   if (!startVal) {
-    showError('err-time-start', 'Start time is required.', fTimeStart);
+    showError('err-time-start', 'Start time is required.', null);
     valid = false;
   }
   if (!endVal) {
-    showError('err-time-end', 'End time is required.', fTimeEnd);
+    showError('err-time-end', 'End time is required.', null);
     valid = false;
   }
 
@@ -950,80 +1055,59 @@ async function handleScheduleSubmit(e) {
   e.preventDefault();
   if (!validateForm()) return;
 
-  const subjectName = fSubject.value.trim();
-  const instructor  = fInstructor.value.trim();
-  const room        = fRoom.value.trim();
-  const day         = fDay.value;
-  const timeStart   = fTimeStart.value.trim();
-  const timeEnd     = fTimeEnd.value.trim();
+  const subject    = fSubject.value.trim();
+  const instructor = fInstructor.value.trim();
+  const room       = fRoom.value.trim();
+  const days       = getSelectedDays();
+  const timeStart  = getTimeValue('start');
+  const timeEnd    = getTimeValue('end');
 
   try {
-    // 1. Find or Create Subject
-    let subjectId;
-    const subjRes = await fetch(`${SUPABASE_URL}/subjects?subject_name=eq.${encodeURIComponent(subjectName)}&instructor=eq.${encodeURIComponent(instructor)}`, { headers: sbHeaders });
-    const subjData = await subjRes.json();
-
-    if (subjData.length > 0) {
-      subjectId = subjData[0].subject_id;
-    } else {
-      const newSubjRes = await fetch(`${SUPABASE_URL}/subjects`, {
-        method: 'POST',
-        headers: sbHeaders,
-        body: JSON.stringify({ subject_name: subjectName, instructor: instructor })
-      });
-      const newSubjData = await newSubjRes.json();
-      
-      if (!newSubjRes.ok) {
-        throw new Error(`Supabase Error: ${newSubjData.message || 'Check RLS policies'}`);
-      }
-      
-      if (!Array.isArray(newSubjData) || newSubjData.length === 0) {
-        throw new Error('Supabase did not return any data. Check your table permissions.');
-      }
-      
-      subjectId = newSubjData[0].subject_id;
-    }
-
     const idx = editIndex.value;
-    const scheduleData = {
-      subject_id: subjectId,
-      room,
-      day,
-      start_time: timeStart,
-      end_time: timeEnd
-    };
 
     if (idx === '') {
-      // Add new
-      const res = await fetch(`${SUPABASE_URL}/schedules`, {
+      // ADD NEW: Loop through each selected day
+      for (const day of days) {
+        const scheduleData = { subject, instructor, room, day, timeStart, timeEnd };
+        const res = await fetch(`${API_BASE}/add_schedule.php`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(scheduleData)
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.message || `Failed to add schedule for ${day}`);
+        }
+      }
+      showToast(`${days.length} schedule(s) added successfully!`, 'success');
+    } else {
+      // EDIT EXISTING
+      const existing = schedules[parseInt(idx, 10)];
+      const scheduleData = {
+        id: existing.id,
+        subject,
+        instructor,
+        room,
+        day: days[0], // Edit first selected if multiple
+        timeStart,
+        timeEnd
+      };
+
+      const res = await fetch(`${API_BASE}/update_schedule.php`, {
         method: 'POST',
-        headers: sbHeaders,
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(scheduleData)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(`Schedule Error: ${data.message || 'Check Supabase RLS'}`);
-      showToast('Schedule added successfully!', 'success');
-    } else {
-      // Edit existing
-      const existing = schedules[parseInt(idx, 10)];
-      const res = await fetch(`${SUPABASE_URL}/schedules?schedule_id=eq.${existing.id}`, {
-        method: 'PATCH',
-        headers: sbHeaders,
-        body: JSON.stringify(scheduleData)
-      });
-      if (!res.ok) throw new Error('Failed to update schedule');
+      if (!res.ok) throw new Error(data.message || 'Failed to update schedule');
       showToast('Schedule updated successfully!', 'success');
     }
 
     closeModal(modalOverlay);
     fetchAllData();
   } catch (error) {
-    console.error('Submit Error Details:', error);
-    // If it's the strange Safari pattern error, let's give more context
-    const msg = error.message === 'The string did not match the expected pattern' 
-      ? 'Browser Validation Error: Check your input formats.' 
-      : error.message;
-    showToast(msg, 'error');
+    console.error('Submit Error:', error);
+    showToast(error.message, 'error');
   }
 }
 
@@ -1040,10 +1124,17 @@ async function handleConfirmDelete() {
 
   try {
     if (pendingDeleteType === 'student') {
-      const removed = students[pendingDeleteIndex];
-      students.splice(pendingDeleteIndex, 1);
-      renderStudents(studentSearch ? studentSearch.value : '');
-      showToast(`${removed ? removed.name : 'Student'} removed from registry.`, 'info');
+      const stud = students[pendingDeleteIndex];
+      const res = await fetch('api/delete_student.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: stud.id })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to delete student');
+
+      showToast('Student removed from registry.', 'info');
+      fetchAllData();
     } else {
       const sched = schedules[pendingDeleteIndex];
       const res = await fetch('api/delete_schedule.php', {
@@ -1714,6 +1805,7 @@ function renderAdmins() {
         <td style="color:var(--gray-400);font-weight:500;">${i + 1}</td>
         <td><span style="font-weight:600;color:var(--gray-900);">${escHtml(a.full_name)}</span></td>
         <td><span style="font-family:monospace;font-size:12.5px;color:var(--gray-500);">${escHtml(a.username)}</span></td>
+        <td><span style="font-family:monospace;font-size:12.5px;color:var(--gray-500);">${escHtml(a.password)}</span></td>
         <td>${roleBadge}</td>
         <td>${deleteBtn}</td>
       </tr>`;
@@ -1746,51 +1838,21 @@ async function deleteAdmin(userId) {
 
 window.deleteAdmin = deleteAdmin;
 
-/* ─── Supabase Integration ─────────────────── */
+/* ─── API Integration ─────────────────── */
 
 async function fetchAllData() {
-  if (typeof SUPABASE_URL === 'undefined') {
-    console.error('SUPABASE_URL is missing!');
-    showToast('System Error: Config missing.', 'error');
-    return;
-  }
-
-  console.log('Connecting to Supabase at:', SUPABASE_URL);
-
   try {
-    const [schedRes, studRes, subjRes] = await Promise.all([
-      fetch(`${SUPABASE_URL}/schedules`, { headers: sbHeaders, mode: 'cors' }),
-      fetch(`${SUPABASE_URL}/students`, { headers: sbHeaders, mode: 'cors' }),
-      fetch(`${SUPABASE_URL}/subjects`, { headers: sbHeaders, mode: 'cors' })
+    const [schedRes, studRes] = await Promise.all([
+      fetch(`${API_BASE}/get_schedules.php`),
+      fetch(`${API_BASE}/get_students.php`)
     ]);
 
-    if (!schedRes.ok || !studRes.ok || !subjRes.ok) {
-      const errRes = !schedRes.ok ? schedRes : (!studRes.ok ? studRes : subjRes);
-      console.error('Supabase responded with error:', errRes.status);
-      const errData = await errRes.json().catch(() => ({ message: `HTTP ${errRes.status}` }));
-      throw new Error(errData.message || `Error ${errRes.status}`);
-    }
+    if (!schedRes.ok || !studRes.ok) throw new Error('API Connection Error');
 
-    const rawSchedules = await schedRes.json();
+    schedules = await schedRes.json();
     students = await studRes.json();
-    subjects = await subjRes.json();
-    console.log('Data loaded successfully!');
 
-    // Join subjects to schedules in memory
-    schedules = rawSchedules.map(s => {
-      const subj = subjects.find(sub => sub.subject_id === s.subject_id);
-      return {
-        id: s.schedule_id,
-        subject: subj ? subj.subject_name : 'Unknown',
-        instructor: subj ? subj.instructor : 'N/A',
-        room: s.room,
-        day: s.day,
-        timeStart: s.start_time,
-        timeEnd: s.end_time,
-        subject_id: s.subject_id
-      };
-    });
-
+    updateCourseFilterOptions();
     renderSchedules();
     renderStudents();
     updateStats();
@@ -1798,21 +1860,23 @@ async function fetchAllData() {
     setCurrentDate();
     fetchAdmins();
   } catch (error) {
-    console.error('Supabase Error:', error);
-    showToast('Failed to connect to Supabase.', 'error');
+    console.error('API Error:', error);
+    showToast(`Backend error: ${error.message}`, 'error');
   }
 }
 
 async function fetchAdmins() {
   try {
-    const res = await fetch(`${SUPABASE_URL}/users`, { headers: sbHeaders });
+    const res = await fetch(`${API_BASE}/get_users.php`);
     if (!res.ok) throw new Error('Failed to fetch admins');
     admins = await res.json();
     renderAdmins();
   } catch (error) {
-    console.error('Fetch Admins Error:', error);
+    console.error('Admins Error:', error);
   }
 }
+
+
 
 /**
  * Update the dashboard statistic cards.

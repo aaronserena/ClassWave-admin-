@@ -17,19 +17,20 @@ if (!$input || empty($input['id'])) {
     exit;
 }
 
-$query = "DELETE FROM schedules WHERE schedule_id = $1";
-$result = pg_query_params($db, $query, [$input['id']]);
+$stmt = mysqli_prepare($db, "DELETE FROM schedules WHERE schedule_id = ?");
+$schedule_id = $input['id'];
+mysqli_stmt_bind_param($stmt, "i", $schedule_id);
 
-if (!$result) {
+if (!mysqli_stmt_execute($stmt)) {
     http_response_code(500);
     echo json_encode([
         "status" => "error", 
-        "message" => "Failed to delete schedule: " . pg_last_error($db)
+        "message" => "Failed to delete schedule: " . mysqli_error($db)
     ]);
     exit;
 }
 
-if (pg_affected_rows($result) == 0) {
+if (mysqli_affected_rows($db) == 0) {
     http_response_code(404);
     echo json_encode(["status" => "error", "message" => "Schedule not found"]);
     exit;

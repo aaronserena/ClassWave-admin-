@@ -1,17 +1,11 @@
 /**
- * ClassWave — Admin Login Logic
+ * ClassWave — Admin Login Logic (PHP/MySQL Version)
  */
 
 document.addEventListener('DOMContentLoaded', () => {
   const loginForm = document.getElementById('login-form');
   const loginBtn = document.getElementById('login-btn');
   const toast = document.getElementById('login-toast');
-
-  // Hardcoded credentials for demo/local dev
-  const ADMIN_CREDENTIALS = {
-    username: 'admin',
-    password: 'password123'
-  };
 
   /**
    * Show toast notification
@@ -46,39 +40,31 @@ document.addEventListener('DOMContentLoaded', () => {
     loginBtn.innerHTML = '<span>Authenticating...</span><div class="spinner"></div>';
 
     try {
-      // 1. Check Supabase
-      const res = await fetch(`${SUPABASE_URL}/users?username=eq.${encodeURIComponent(usernameInput)}&password=eq.${encodeURIComponent(passwordInput)}`, {
-        headers: sbHeaders
+      // Fetch from local PHP API
+      const res = await fetch('api/login.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: usernameInput,
+          password: passwordInput
+        })
       });
       
-      const users = await res.json();
+      const data = await res.json();
 
-      if (users.length > 0) {
-        const user = users[0];
+      if (res.ok) {
         showToast('Login successful!', 'success');
         
         localStorage.setItem('classwave_admin_logged_in', 'true');
-        localStorage.setItem('classwave_admin_user', user.full_name);
-        localStorage.setItem('classwave_admin_username', user.username);
-        localStorage.setItem('classwave_admin_role', user.role);
+        localStorage.setItem('classwave_admin_user', data.user.full_name);
+        localStorage.setItem('classwave_admin_username', data.user.username);
+        localStorage.setItem('classwave_admin_role', data.user.role);
 
         setTimeout(() => {
           window.location.href = 'index.html';
         }, 1200);
       } else {
-        // 2. Local Fallback (for safety during migration)
-        const isSuperAdmin = (usernameInput === 'serenaaaronpoe' && passwordInput === 'serenaaaronpoe123');
-        if (isSuperAdmin) {
-           showToast('Login successful (Override)!', 'success');
-           localStorage.setItem('classwave_admin_logged_in', 'true');
-           localStorage.setItem('classwave_admin_user', 'Serena Aaron Poe');
-           localStorage.setItem('classwave_admin_username', 'serenaaaronpoe');
-           localStorage.setItem('classwave_admin_role', 'super_admin');
-           setTimeout(() => window.location.href = 'index.html', 1200);
-           return;
-        }
-
-        showToast('Invalid username or password.', 'error');
+        showToast(data.message || 'Invalid username or password.', 'error');
         loginBtn.disabled = false;
         loginBtn.innerHTML = originalText;
         loginForm.classList.add('shake');
@@ -86,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (error) {
       console.error('Login Error:', error);
-      showToast('Connection failed. Please check your internet.', 'error');
+      showToast('Connection failed. Please make sure XAMPP is running.', 'error');
       loginBtn.disabled = false;
       loginBtn.innerHTML = originalText;
     }
@@ -111,6 +97,9 @@ style.textContent = `
     0%, 100% { transform: translateX(0); }
     20%, 60% { transform: translateX(-10px); }
     40%, 80% { transform: translateX(10px); }
+  }
+  .shake {
+    animation: shake 0.4s ease-in-out;
   }
   .shake {
     animation: shake 0.4s ease-in-out;

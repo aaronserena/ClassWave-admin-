@@ -29,35 +29,40 @@ try {
     // 1. Build the update query dynamically
     $fields = [];
     $params = [];
-    $i = 1;
+    $types = "";
 
     if ($new_fullname) {
-        $fields[] = "full_name = $" . $i++;
+        $fields[] = "full_name = ?";
         $params[] = $new_fullname;
+        $types .= "s";
     }
     if ($new_username) {
-        $fields[] = "username = $" . $i++;
+        $fields[] = "username = ?";
         $params[] = $new_username;
+        $types .= "s";
     }
     if ($new_password) {
-        $fields[] = "password = $" . $i++;
+        $fields[] = "password = ?";
         $params[] = $new_password;
+        $types .= "s";
     }
 
     if (empty($fields)) {
         http_response_code(400);
-        echo json_encode(['message' => 'No fields to update.']);
+        echo json_encode(['message' => 'No changes provided.']);
         exit;
     }
 
+    $query = "UPDATE users SET " . implode(', ', $fields) . " WHERE username = ?";
     $params[] = $current_username;
-    $query = "UPDATE users SET " . implode(', ', $fields) . " WHERE username = $" . $i;
-    
-    $result = pg_query_params($db, $query, $params);
+    $types .= "s";
 
-    if (!$result) {
-        $error = pg_last_error($db);
-        if (strpos($error, 'duplicate key') !== false) {
+    $stmt = mysqli_prepare($db, $query);
+    mysqli_stmt_bind_param($stmt, $types, ...$params);
+
+    if (!mysqli_stmt_execute($stmt)) {
+        $error = mysqli_error($db);
+        if (strpos($error, 'Duplicate entry') !== false) {
             http_response_code(409);
             echo json_encode(['message' => 'New username already exists.']);
         } else {

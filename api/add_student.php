@@ -1,8 +1,6 @@
 <?php
 /**
- * ADD Student
- * 
- * Registers a new student in the system.
+ * ADD Student (MySQL Version)
  */
 
 header('Content-Type: application/json');
@@ -25,27 +23,32 @@ foreach ($required as $field) {
     }
 }
 
+$active = isset($input['active']) ? ($input['active'] ? 1 : 0) : 1;
+
 $query = "
     INSERT INTO students (student_id, name, course, year_level, section, is_active)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    ON CONFLICT (student_id) DO UPDATE 
-    SET name = EXCLUDED.name, course = EXCLUDED.course, year_level = EXCLUDED.year_level, section = EXCLUDED.section, is_active = EXCLUDED.is_active
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE 
+    name = VALUES(name), 
+    course = VALUES(course), 
+    year_level = VALUES(year_level), 
+    section = VALUES(section), 
+    is_active = VALUES(is_active)
 ";
 
-$active = isset($input['active']) ? ($input['active'] ? 'true' : 'false') : 'true';
-
-$result = pg_query_params($db, $query, [
+$stmt = mysqli_prepare($db, $query);
+mysqli_stmt_bind_param($stmt, "sssssi", 
     $input['id'],
     $input['name'],
     $input['course'],
     $input['year'],
     $input['section'],
     $active
-]);
+);
 
-if (!$result) {
+if (!mysqli_stmt_execute($stmt)) {
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "Failed to add student: " . pg_last_error($db)]);
+    echo json_encode(["status" => "error", "message" => "Failed to add student: " . mysqli_error($db)]);
     exit;
 }
 

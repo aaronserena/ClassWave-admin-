@@ -1,6 +1,6 @@
 <?php
 /**
- * ClassWave — Admin Login API
+ * ClassWave — Admin Login API (MySQL Version)
  */
 
 header('Content-Type: application/json');
@@ -17,7 +17,7 @@ if (!isset($input['username']) || !isset($input['password'])) {
 $username = $input['username'];
 $password = $input['password'];
 
-// DEVELOPMENT FALLBACK: Hardcoded super admin for local testing if DB is not ready
+// DEVELOPMENT FALLBACK: Hardcoded super admin
 if ($username === 'serenaaaronpoe' && $password === 'serenaaaronpoe123') {
     echo json_encode([
         'message' => 'Login successful (Dev Mode)',
@@ -30,20 +30,13 @@ if ($username === 'serenaaaronpoe' && $password === 'serenaaaronpoe123') {
     exit;
 }
 
-// If we reach here, we need the DB
-if (!$db) {
-    http_response_code(500);
-    echo json_encode(['message' => 'Database connection required for this user.']);
-    exit;
-}
-
 try {
-    $query = "SELECT * FROM users WHERE username = $1 LIMIT 1";
-    $result = pg_query_params($db, $query, [$username]);
+    $stmt = mysqli_prepare($db, "SELECT * FROM users WHERE username = ? LIMIT 1");
+    mysqli_stmt_bind_param($stmt, "s", $username);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
     
-    if (!$result) throw new Exception("Query error: " . pg_last_error($db));
-    
-    $user = pg_fetch_assoc($result);
+    $user = mysqli_fetch_assoc($result);
 
     if ($user && $user['password'] === $password) {
         // Successful login
@@ -63,3 +56,4 @@ try {
     http_response_code(500);
     echo json_encode(['message' => 'System error: ' . $e->getMessage()]);
 }
+?>

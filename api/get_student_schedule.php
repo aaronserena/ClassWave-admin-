@@ -30,6 +30,7 @@ try {
             sub.subject_name as subject,
             sub.course_code,
             sub.instructor,
+            sub.units,
             s.room,
             s.day,
             s.start_time,
@@ -37,7 +38,7 @@ try {
         FROM enrollments e
         JOIN schedules s ON e.schedule_id = s.schedule_id
         JOIN subjects sub ON s.subject_id = sub.subject_id
-        WHERE e.student_id = $1
+        WHERE e.student_id = ?
         ORDER BY 
             CASE 
                 WHEN s.day = 'Monday' THEN 1
@@ -51,16 +52,19 @@ try {
             s.start_time
     ";
     
-    $result = pg_query_params($db, $query, [$student_id]);
+    $stmt = mysqli_prepare($db, $query);
+    mysqli_stmt_bind_param($stmt, "s", $student_id);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
     
-    if (!$result) throw new Exception(pg_last_error($db));
+    if (!$result) throw new Exception(mysqli_error($db));
     
-    $schedules = pg_fetch_all($result) ?: [];
+    $schedules = [];
+    while ($row = mysqli_fetch_assoc($result)) {
+        $schedules[] = $row;
+    }
 
-    echo json_encode([
-        'success' => true,
-        'data' => $schedules
-    ]);
+    echo json_encode($schedules);
 
 } catch (Exception $e) {
     http_response_code(500);

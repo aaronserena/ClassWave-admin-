@@ -22,9 +22,12 @@ if (!isset($input['user_id'])) {
 
 try {
     // 1. Check role
-    $check_query = "SELECT role FROM users WHERE user_id = $1";
-    $check_res = pg_query_params($db, $check_query, [$input['user_id']]);
-    $user = pg_fetch_assoc($check_res);
+    $check_stmt = mysqli_prepare($db, "SELECT role FROM users WHERE user_id = ?");
+    $user_id = $input['user_id'];
+    mysqli_stmt_bind_param($check_stmt, "i", $user_id);
+    mysqli_stmt_execute($check_stmt);
+    $check_res = mysqli_stmt_get_result($check_stmt);
+    $user = mysqli_fetch_assoc($check_res);
 
     if ($user && $user['role'] === 'super_admin') {
         http_response_code(403);
@@ -33,10 +36,12 @@ try {
     }
 
     // 2. Delete
-    $del_query = "DELETE FROM users WHERE user_id = $1";
-    $del_res = pg_query_params($db, $del_query, [$input['user_id']]);
-
-    if (!$del_res) throw new Exception(pg_last_error($db));
+    $del_stmt = mysqli_prepare($db, "DELETE FROM users WHERE user_id = ?");
+    mysqli_stmt_bind_param($del_stmt, "i", $user_id);
+    
+    if (!mysqli_stmt_execute($del_stmt)) {
+        throw new Exception(mysqli_error($db));
+    }
 
     echo json_encode(['message' => 'Admin account deleted.']);
 } catch (Exception $e) {
